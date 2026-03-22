@@ -300,9 +300,66 @@ h2 {
   background: #0b0b0c;
 }
 
+.download-page {
+  min-height: 100vh;
+  padding: 48px 24px 64px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(180deg, #0b0b0c 0%, #090909 100%);
+}
+
+.download-hero,
+.download-card {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0e0e10;
+}
+
+.download-hero {
+  padding: 40px 32px;
+}
+
+.download-lede {
+  margin: 18px 0 0;
+  max-width: 780px;
+  font-size: 15px;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.download-grid {
+  display: grid;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 18px auto 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.download-card {
+  padding: 24px;
+}
+
+.download-list {
+  margin: 18px 0 0;
+  padding-left: 20px;
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.9;
+}
+
 @media (max-width: 960px) {
   .stats-grid,
-  .split-grid {
+  .split-grid,
+  .download-grid {
     grid-template-columns: 1fr;
   }
 }

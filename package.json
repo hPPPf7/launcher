@@ -2,6 +2,8 @@
   "name": "launcher",
   "version": "0.1.0",
   "private": true,
+  "description": "HanBurger desktop platform launcher",
+  "author": "hPPPf7",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev",
@@ -9,9 +11,11 @@
     "start": "next start",
     "desktop": "electron .",
     "desktop:dev": "node scripts/desktop-dev.mjs",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "dist:win": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "next": "^16.1.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -19,7 +23,43 @@
   "devDependencies": {
     "@types/react": "19.2.14",
     "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
     "eslint": "^9.38.0",
     "eslint-config-next": "^16.1.2"
+  },
+  "build": {
+    "appId": "com.hanburger.launcher",
+    "productName": "HanBurger",
+    "artifactName": "HanBurger-Setup.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "hPPPf7",
+      "repo": "launcher"
+    }
   }
 }

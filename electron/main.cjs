@@ -1,9 +1,17 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const fs = require("fs");
 const path = require("path");
 
 const appName = "HanBurger";
 app.setName(appName);
+const packagedDesktopEntry = path.join(
+  __dirname,
+  "..",
+  "out",
+  "desktop",
+  "index.html"
+);
 
 function getHanBurgerRoot() {
   const configuredRoot = process.env.HANBURGER_HOME;
@@ -16,7 +24,6 @@ function getHanBurgerRoot() {
 
 const isDev = !app.isPackaged;
 const devUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:3000/desktop";
-const prodUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:3000/desktop";
 
 function getStoragePaths() {
   const root = getHanBurgerRoot();
@@ -155,7 +162,52 @@ function createMainWindow() {
     window.webContents.openDevTools({ mode: "detach" });
   }
 
-  window.loadURL(isDev ? devUrl : prodUrl);
+  if (isDev) {
+    window.loadURL(devUrl);
+    return;
+  }
+
+  window.loadFile(packagedDesktopEntry);
+
+  return window;
+}
+
+function setupAutoUpdater() {
+  if (isDev) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("error", (error) => {
+    console.error("[updater] error", error);
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    console.log("[updater] update available", info?.version ?? "unknown");
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    console.log("[updater] no update available");
+  });
+
+  autoUpdater.on("update-downloaded", async () => {
+    const result = await dialog.showMessageBox({
+      type: "info",
+      buttons: ["立即更新", "稍後"],
+      defaultId: 0,
+      cancelId: 1,
+      title: "HanBurger 更新已下載完成",
+      message: "已有新版 HanBurger，是否現在重新啟動並安裝更新？",
+    });
+
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+
+  autoUpdater.checkForUpdates().catch((error) => {
+    console.error("[updater] check failed", error);
+  });
 }
 
 app.whenReady().then(() => {
@@ -163,6 +215,7 @@ app.whenReady().then(() => {
   process.env.HANBURGER_ROOT = storagePaths.root;
   registerIpcHandlers(storagePaths);
   createMainWindow();
+  setupAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
