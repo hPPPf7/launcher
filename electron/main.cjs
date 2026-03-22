@@ -1,16 +1,12 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 
 const appName = "HanBurger";
 app.setName(appName);
-const packagedDesktopEntry = path.join(
-  __dirname,
-  "..",
-  "out",
-  "desktop.html"
-);
+const packagedOutDir = path.join(__dirname, "..", "out");
 
 function getHanBurgerRoot() {
   const configuredRoot = process.env.HANBURGER_HOME;
@@ -23,6 +19,100 @@ function getHanBurgerRoot() {
 
 const isDev = !app.isPackaged;
 const devUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:3000/desktop";
+let packagedServer = null;
+
+function getMimeType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  switch (extension) {
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".js":
+      return "application/javascript; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".svg":
+      return "image/svg+xml";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".ico":
+      return "image/x-icon";
+    case ".txt":
+      return "text/plain; charset=utf-8";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+function resolvePackagedRequestPath(requestUrl) {
+  const parsedUrl = new URL(requestUrl, "http://127.0.0.1");
+  const pathname = decodeURIComponent(parsedUrl.pathname);
+
+  if (pathname === "/" || pathname === "/index.html") {
+    return path.join(packagedOutDir, "index.html");
+  }
+
+  if (pathname === "/desktop" || pathname === "/desktop/") {
+    return path.join(packagedOutDir, "desktop.html");
+  }
+
+  if (pathname === "/desktop.html") {
+    return path.join(packagedOutDir, "desktop.html");
+  }
+
+  return path.join(packagedOutDir, pathname.replace(/^\/+/, ""));
+}
+
+function startPackagedServer() {
+  if (packagedServer) {
+    return Promise.resolve(packagedServer);
+  }
+
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((request, response) => {
+      const filePath = resolvePackagedRequestPath(request.url || "/");
+
+      if (!filePath.startsWith(packagedOutDir)) {
+        response.writeHead(403);
+        response.end("Forbidden");
+        return;
+      }
+
+      fs.readFile(filePath, (error, content) => {
+        if (error) {
+          response.writeHead(404);
+          response.end("Not found");
+          return;
+        }
+
+        response.writeHead(200, {
+          "Content-Type": getMimeType(filePath),
+          "Cache-Control": "no-cache",
+        });
+        response.end(content);
+      });
+    });
+
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address !== "object") {
+        reject(new Error("PACKAGED_SERVER_START_FAILED"));
+        return;
+      }
+
+      packagedServer = {
+        server,
+        url: `http://127.0.0.1:${address.port}/desktop`,
+      };
+      resolve(packagedServer);
+    });
+  });
+}
 
 function getStoragePaths() {
   const root = getHanBurgerRoot();
@@ -128,7 +218,7 @@ function registerIpcHandlers(storagePaths) {
   });
 }
 
-function createMainWindow() {
+async function createMainWindow() {
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -163,10 +253,11 @@ function createMainWindow() {
 
   if (isDev) {
     window.loadURL(devUrl);
-    return;
+    return window;
   }
 
-  window.loadFile(packagedDesktopEntry);
+  const packagedRuntime = await startPackagedServer();
+  window.loadURL(packagedRuntime.url);
 
   return window;
 }
@@ -209,21 +300,25 @@ function setupAutoUpdater() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const storagePaths = ensureStorageStructure();
   process.env.HANBURGER_ROOT = storagePaths.root;
   registerIpcHandlers(storagePaths);
-  createMainWindow();
+  await createMainWindow();
   setupAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
+      void createMainWindow();
     }
   });
 });
 
 app.on("window-all-closed", () => {
+  if (packagedServer?.server) {
+    packagedServer.server.close();
+    packagedServer = null;
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }
