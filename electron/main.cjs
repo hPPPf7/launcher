@@ -9,8 +9,7 @@ const packagedDesktopEntry = path.join(
   __dirname,
   "..",
   "out",
-  "desktop",
-  "index.html"
+  "desktop.html"
 );
 
 function getHanBurgerRoot() {
